@@ -1,85 +1,28 @@
 using System;
 using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using Reminder.Storage.InMemory;
 using Reminder.Domain.Model;
+using Reminder.Receiver.Core;
+using Reminder.Sender.Core;
 
 namespace Reminder.Domain.Tests
 {
 	[TestClass]
 	public class ReminderDomainTests
 	{
-		[TestMethod]
-		public void Check_That_Reminder_Calls_Internal_Delegate()
-		{
-			var reminderStorage = new ReminderStorage();
-
-			using (var reminderDomain = new ReminderDomain(
-				reminderStorage,
-				TimeSpan.FromMilliseconds(100),
-				TimeSpan.FromMilliseconds(100)))
-			{
-				bool delegateWasCalled = false;
-
-				reminderDomain.SendReminder += (reminder) =>
-				{
-					delegateWasCalled = true;
-				};
-
-				reminderDomain.AddReminder(
-					new AddReminderModel
-					{
-						Date = DateTimeOffset.Now
-					});
-
-				reminderDomain.Run();
-
-				Thread.Sleep(300);
-
-				Assert.IsTrue(delegateWasCalled);
-			}
-		}
+		public Mock<IReminderReceiver> receiverMock = new Mock<IReminderReceiver>();
+		public Mock<IReminderSender> senderMock = new Mock<IReminderSender>();
 
 		[TestMethod]
-		public void Check_That_On_SendReminder_Exception_SendingFailed_Event_Raised()
+		public void When_SendReminder_OK_SendingSuccedded_Event_Raised()
 		{
-			var reminderStorage = new ReminderStorage();
+			var reminderStorage = new InMemoryReminderStorage();
 			using (var reminderDomain = new ReminderDomain(
 				reminderStorage,
-				TimeSpan.FromMilliseconds(100),
-				TimeSpan.FromMilliseconds(100)))
-			{
-				reminderDomain.SendReminder += (reminder) =>
-				{
-					throw new Exception();
-				};
-
-				bool eventHandlerCalled = false;
-
-				reminderDomain.SendingFailed += (s, e) =>
-				{
-					eventHandlerCalled = true;
-				};
-
-				reminderDomain.AddReminder(
-					new AddReminderModel
-					{
-						Date = DateTimeOffset.Now
-					});
-
-				reminderDomain.Run();
-
-				Thread.Sleep(300);
-
-				Assert.IsTrue(eventHandlerCalled);
-			}
-		}
-
-		public void Check_That_On_SendReminder_OK_SendingSuccedded_Event_Raised()
-		{
-			var reminderStorage = new ReminderStorage();
-			using (var reminderDomain = new ReminderDomain(
-				reminderStorage,
+				receiverMock.Object,
+				senderMock.Object,
 				TimeSpan.FromMilliseconds(100),
 				TimeSpan.FromMilliseconds(100)))
 			{
@@ -90,11 +33,10 @@ namespace Reminder.Domain.Tests
 					eventHandlerCalled = true;
 				};
 
-				reminderDomain.AddReminder(
-					new AddReminderModel
-					{
-						Date = DateTimeOffset.Now
-					});
+				reminderStorage.Add(new Storage.Core.ReminderItem
+				{
+					Date = DateTimeOffset.Now
+				});
 
 				reminderDomain.Run();
 
